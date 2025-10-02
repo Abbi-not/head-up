@@ -1,37 +1,42 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { categories } from "../../src/data/words";
 
 export default function GameScreen() {
-  const { category } = useLocalSearchParams<{ category?: string }>();
+  const { words, time } = useLocalSearchParams<{ words?: string; time?: string }>();
   const router = useRouter();
+
+  const initialWords = words ? words.split(",").map((w) => w.trim()) : [];
+  const initialTime = time ? parseInt(time, 10) : 60;
 
   const [wordList, setWordList] = useState<string[]>([]);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(initialTime);
 
   const tapTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastTap = useRef<number>(0);
 
-  // Load words
+  // Reset state whenever new words or time are passed
   useEffect(() => {
-    if (category && categories[category]) {
-      setWordList(shuffleArray([...categories[category]]));
-      setCurrentWordIndex(0);
-      setScore(0);
-      setTimeLeft(60);
-    }
-  }, [category]);
+    setWordList(shuffleArray(initialWords));
+    setCurrentWordIndex(0);
+    setScore(0);
+    setTimeLeft(initialTime);
+  }, [words, time]);
 
-  // Timer countdown
+  // Timer logic
   useEffect(() => {
+    if (wordList.length === 0) {
+      router.push(`/score?score=${score}`);
+      return;
+    }
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          router.push(`/(tabs)/score?score=${score}`);
+          router.push(`/score?score=${score}`);
           return 0;
         }
         return prev - 1;
@@ -39,24 +44,27 @@ export default function GameScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [score, router]);
+  }, [wordList, score, router]);
 
   const nextWord = () => {
+    if (wordList.length === 0) return;
     setCurrentWordIndex((i) => (i + 1) % wordList.length);
   };
 
+  // Handle single tap (skip) and double tap (correct)
   const handleTap = () => {
     const now = Date.now();
     if (lastTap.current && now - lastTap.current < 300) {
-      // Double tap → correct
-      if (tapTimeout.current) {
-        clearTimeout(tapTimeout.current);
-        tapTimeout.current = null;
-      }
+      // Double tap = correct
+      if (tapTimeout.current) clearTimeout(tapTimeout.current);
       setScore((s) => s + 1);
-      nextWord();
+      setWordList((prev) => {
+        const newList = prev.filter((_, idx) => idx !== currentWordIndex);
+        return newList.length > 0 ? newList : [];
+      });
+      setCurrentWordIndex(0);
     } else {
-      // Single tap → skip
+      // Single tap = skip
       tapTimeout.current = setTimeout(() => nextWord(), 300);
     }
     lastTap.current = now;
@@ -65,7 +73,7 @@ export default function GameScreen() {
   if (!wordList.length) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loading}>Loading words...</Text>
+        <Text style={styles.loading}>All words guessed! 🎉</Text>
       </View>
     );
   }
@@ -87,12 +95,12 @@ export default function GameScreen() {
         <Text style={styles.word}>{wordList[currentWordIndex]}</Text>
       </TouchableOpacity>
 
-      <Text style={styles.tip}>Single tap = Skip ❌ | Double tap = Correct ✅</Text>
+      <Text style={styles.tip}></Text>
     </View>
   );
 }
 
-// Shuffle utility
+// Utility: Shuffle array
 function shuffleArray(array: string[]) {
   return array.sort(() => Math.random() - 0.5);
 }

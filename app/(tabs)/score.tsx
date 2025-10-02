@@ -10,10 +10,7 @@ export default function ScoreScreen() {
       <Text style={styles.title}>Game Over 🎉</Text>
       <Text style={styles.score}>Your Score: {score ?? 0}</Text>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => router.replace("/(tabs)")}
-      >
+      <TouchableOpacity style={styles.button} onPress={() => router.replace("/")}>
         <Text style={styles.buttonText}>Play Again</Text>
       </TouchableOpacity>
     </View>
